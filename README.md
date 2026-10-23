@@ -21,10 +21,9 @@ Yggdrasil Gateway 是一款旨于实现正版和外置登录共存的支持，�
 
 
 
+## Docker 
 
-## Docker (GitHub Container Registry)
-
-The `main` branch image is published as `latest`; version tags are published with the matching tag. Pull and run it with:
+`main` 分支的镜像会以 `latest` 发布；版本标签则以对应的标签名发布。拉取并运行它的命令如下：
 
 ```sh
 docker pull ghcr.io/fuuuuwaaaaaaa/yggdrasilgateway:latest
@@ -36,4 +35,4 @@ docker run -d --name yggdrasilgateway \
   ghcr.io/fuuuuwaaaaaaa/yggdrasilgateway:latest
 ```
 
-Back up the `data` directory before upgrades. Configure the database and HTTP listener in the generated properties under `config/`. On first startup, a random administrator password is saved to `data/initial-admin-password.txt`; sign in as `admin`, change it, then delete that file. The image is published by this fork's GitHub Actions after a successful build; the first image becomes available after that workflow completes. GitHub Container Registry packages start private unless you change the package visibility; make the package public to allow unauthenticated production pulls, or authenticate with `docker login ghcr.io`.
+升级前请备份 `data` 目录。在 `config/` 下生成的属性文件中配置数据库和 HTTP 监听器。首次启动时，随机管理员密码会保存到 `data/initial-admin-password.txt`；请以 `admin` 身份登录，修改密码，然后删除该文件。
