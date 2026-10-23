@@ -5,15 +5,10 @@ plugins {
 //    id 'maven-publish'
 }
 
-def gitOutput = new ByteArrayOutputStream()
-exec { ExecSpec spec ->
-    spec.commandLine = ['git', 'rev-parse', 'HEAD']
-    spec.standardOutput = gitOutput
-    spec.errorOutput = System.err
-    spec.workingDir(rootDir)
-}.assertNormalExitValue()
-
-def gitHash = gitOutput.toString().trim()
+def gitHash = providers.exec {
+    commandLine('git', 'rev-parse', 'HEAD')
+    workingDir(rootDir)
+}.standardOutput.asText.get().trim()
 println("GIT " + gitHash)
 
 allprojects {
