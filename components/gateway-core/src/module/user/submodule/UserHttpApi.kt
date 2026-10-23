@@ -93,20 +93,25 @@ private object UserHttpApi {
             )
 
             val req = call.receive<Req>()
+            val maxLifetime = TimeUnit.DAYS.toMillis(1)
+            if (req.time !in 1L..maxLifetime) {
+                throw ApiRejectedException("Token lifetime must be between 1 ms and 24 hours")
+            }
 
             val now = System.currentTimeMillis()
+            val validUntil = now + req.time
             val jwt = JWT.create()
                 .withIssuer(JwtAuthorizationConfig.issuer)
                 .withAudience("authorization/user")
                 .withSubject(principal.userid.toString())
                 .withNotBefore(Instant.ofEpochMilli(now))
-                .withExpiresAt(Instant.ofEpochMilli(now + req.time))
+                .withExpiresAt(Instant.ofEpochMilli(validUntil))
                 .sign(JwtAuthorizationConfig.algorithm)
 
             call.respond(ApiSuccessDataResponse {
                 "token" value jwt
-                "validToInstant" value Instant.ofEpochMilli(now + req.time).toString()
-                "validToTimestamp" value (now + req.time)
+                "validToInstant" value Instant.ofEpochMilli(validUntil).toString()
+                "validToTimestamp" value validUntil
             })
         }
         post("/user/reset-password") {

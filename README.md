@@ -20,3 +20,19 @@ Yggdrasil Gateway 是一款旨于实现正版和外置登录共存的支持，�
 - 见 https://yggdrasilgateway.github.io/
 
 
+
+## Docker 
+
+`main` 分支的镜像会以 `latest` 发布；版本标签则以对应的标签名发布。拉取并运行它的命令如下：
+
+```sh
+docker pull ghcr.io/fuuuuwaaaaaaa/yggdrasilgateway:latest
+docker run -d --name yggdrasilgateway \
+  -p 8080:8080 \
+  -v "$PWD/data:/app/run/data" \
+  -v "$PWD/config:/app/run/config" \
+  --restart unless-stopped \
+  ghcr.io/fuuuuwaaaaaaa/yggdrasilgateway:latest
+```
+
+升级前请备份 `data` 目录。在 `config/` 下生成的属性文件中配置数据库和 HTTP 监听器。首次启动时，随机管理员密码会保存到 `data/initial-admin-password.txt`；请以 `admin` 身份登录，修改密码，然后删除该文件。

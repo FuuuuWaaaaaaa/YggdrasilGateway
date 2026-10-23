@@ -32,6 +32,7 @@ import org.ktorm.entity.find
 import org.ktorm.entity.firstOrNull
 import org.ktorm.entity.sequenceOf
 import org.slf4j.LoggerFactory
+import java.net.URI
 import java.util.*
 
 
@@ -39,6 +40,34 @@ import java.util.*
 internal object ApiServer {
     private val log = LoggerFactory.getLogger(ApiServer::class.java)
     private val REJECTION_UUID = UUID(0, 0)
+
+    private suspend fun allowedSkinDomains(): Set<String> = coroutineScope {
+        buildSet {
+            add("textures.minecraft.net")
+        YggdrasilServicesHolder.services.values
+            .asSequence()
+            .filter { it.active }
+            .mapNotNull { service ->
+                runCatching { URI(service.urlPath) }.getOrNull()
+                    ?.takeIf { it.scheme.equals("http", true) || it.scheme.equals("https", true) }
+                    ?.takeIf { it.userInfo == null }
+                    ?.host
+                    ?.lowercase(Locale.ROOT)
+            }
+            .forEach(::add)
+
+        YggdrasilServicesHolder.services.values
+            .asSequence()
+            .filter { it.active }
+            .map { service ->
+                async(Dispatchers.IO) { runCatching { service.service.skinDomains() }.getOrDefault(emptySet()) }
+            }
+            .toList()
+            .awaitAll()
+            .flatten()
+            .mapTo(this) { it.lowercase(Locale.ROOT) }
+        }
+    }
 
     @EventSubscriber.Handler
     fun ApiRouteInitializeEvent.handle() {
@@ -82,8 +111,9 @@ internal object ApiServer {
     private fun Route.mount() {
         get("/") {
             call.respondText(contentType = ContentType.Application.Json.withCharset(Charsets.UTF_8)) {
+                val skinDomains = allowedSkinDomains()
                 buildJsonObject {
-                    "skinDomains" arr {}
+                    "skinDomains" arr { skinDomains.forEach { +it } }
                     "signaturePublickey"(YggdrasilServicesHolder.flags.deliveredPublicKey)
                 }.toString()
             }
@@ -318,7 +348,23 @@ internal object ApiServer {
         }
 
         get(Regex("/sessionserver/redirect(?<redirect>.+)")) {
-            call.respondRedirect(call.parameters["redirect"] ?: "/")
+            val redirect = call.parameters["redirect"] ?: throw ApiRejectedException("Missing redirect target")
+            val target = runCatching { URI(redirect) }.getOrNull()
+                ?: throw ApiRejectedException("Invalid redirect target")
+
+            val isSafeRelativePath = redirect.startsWith('/') &&
+                    !redirect.startsWith("//") &&
+                    !redirect.contains('\\') &&
+                    redirect.none { it.code < 0x20 || it.code == 0x7f }
+            val isAllowedAbsoluteUrl = target.isAbsolute &&
+                    (target.scheme.equals("http", true) || target.scheme.equals("https", true)) &&
+                    target.userInfo == null &&
+                    target.host?.lowercase(Locale.ROOT) in allowedSkinDomains()
+
+            if (!isSafeRelativePath && !isAllowedAbsoluteUrl) {
+                throw ApiRejectedException("Redirect target is not allowed")
+            }
+            call.respondRedirect(target.toString())
         }
 
         route("{...}") {

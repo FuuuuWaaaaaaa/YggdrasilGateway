@@ -9,6 +9,10 @@ internal class YggdrasilServiceWithTimeout(
     val delegate: YggdrasilService,
     val timeout: Long,
 ) : YggdrasilService {
+    override suspend fun skinDomains(): Set<String> = withTimeout(timeout) {
+        delegate.skinDomains()
+    }
+
     override suspend fun hasJoined(params: Parameters): PlayerProfile? = withTimeout(timeout) {
         delegate.hasJoined(params)
     }
