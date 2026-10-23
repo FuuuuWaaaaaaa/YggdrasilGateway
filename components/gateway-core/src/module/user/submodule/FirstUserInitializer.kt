@@ -8,6 +8,13 @@ import com.kasukusakura.yggdrasilgateway.core.module.user.db.UserRoleTable
 import com.kasukusakura.yggdrasilgateway.core.module.user.db.UsersTable
 import org.ktorm.dsl.*
 import org.slf4j.LoggerFactory
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
+import java.security.SecureRandom
+import java.util.Base64
+import java.util.EnumSet
 
 @EventSubscriber
 internal object FirstUserInitializer {
@@ -25,11 +32,19 @@ internal object FirstUserInitializer {
             if (result.getInt(1) == 0) {
                 log.info("Creating First User...")
 
+                val initialPassword = ByteArray(32).also(SecureRandom()::nextBytes)
+                    .let { Base64.getUrlEncoder().withoutPadding().encodeToString(it) }
+                val passwordSalt = ByteArray(32).also(SecureRandom()::nextBytes)
+                writeInitialPassword(initialPassword)
+
                 mysqlDatabase.insert(UsersTable) {
                     set(UsersTable.username, "admin")
                     set(UsersTable.email, "admin@localhost")
-                    set(UsersTable.password, PasswordHasher.hashPassword("admin".toByteArray(), "admin".toByteArray()))
-                    set(UsersTable.passwordSalt, "admin".toByteArray())
+                    set(
+                        UsersTable.password,
+                        PasswordHasher.hashPassword(initialPassword.toByteArray(), passwordSalt)
+                    )
+                    set(UsersTable.passwordSalt, passwordSalt)
                     set(UsersTable.creationTime, System.currentTimeMillis())
                 }
 
@@ -43,7 +58,26 @@ internal object FirstUserInitializer {
                     set(UserRoleTable.userid, uid)
                     set(UserRoleTable.role, "yg-admin")
                 }
+                log.info("Initial admin password was written to data/initial-admin-password.txt")
             }
         }
+    }
+
+    private fun writeInitialPassword(password: String) {
+        val path = Path.of("data", "initial-admin-password.txt")
+        Files.createDirectories(path.parent)
+        try {
+            Files.createFile(
+                path,
+                PosixFilePermissions.asFileAttribute(
+                    EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
+                )
+            )
+        } catch (_: UnsupportedOperationException) {
+            if (!Files.exists(path)) Files.createFile(path)
+        } catch (_: java.nio.file.FileAlreadyExistsException) {
+            // A stale bootstrap secret can exist if the database transaction failed earlier.
+        }
+        Files.writeString(path, password)
     }
 }

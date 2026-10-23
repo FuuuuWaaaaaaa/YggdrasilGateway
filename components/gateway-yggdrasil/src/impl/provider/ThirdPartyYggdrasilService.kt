@@ -16,6 +16,7 @@ import io.ktor.utils.io.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.withTimeout
 import java.net.URI
 
 internal class ThirdPartyYggdrasilService(
@@ -37,6 +38,20 @@ internal class ThirdPartyYggdrasilService(
 
     }
 
+
+    override suspend fun skinDomains(): Set<String> = withTimeout(3000) {
+        val response = sharedHttpClient.get(basePath.toString())
+        if (!response.status.isSuccess()) return@withTimeout emptySet()
+        val json = runCatching { JsonParser.parseString(response.bodyAsText()).asJsonObject }.getOrNull()
+            ?: return@withTimeout emptySet()
+        json.getAsJsonArray("skinDomains")?.mapNotNull { element ->
+            element.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                ?.asString
+                ?.trim()
+                ?.lowercase()
+                ?.takeIf { it.isNotEmpty() && it.none { ch -> ch == '/' || ch == ':' || ch.isWhitespace() } }
+        }?.toSet().orEmpty()
+    }
 
     override suspend fun hasJoined(params: Parameters): PlayerProfile? {
         return sharedHttpClient.get(basePath.resolve("sessionserver/session/minecraft/hasJoined").toString()) {

@@ -30,6 +30,8 @@ internal object MojangYggdrasilProvider : YggdrasilServiceProvider, YggdrasilSer
         return this
     }
 
+    override suspend fun skinDomains(): Set<String> = setOf("textures.minecraft.net")
+
     override suspend fun hasJoined(params: Parameters): PlayerProfile? {
         return sharedHttpClient.get("https://sessionserver.mojang.com/session/minecraft/hasJoined") {
             url.parameters.appendAll(params)
