@@ -87,7 +87,8 @@ internal object YggdrasilGatewayCore {
     @EventSubscriber.Handler
     private fun YggdrasilHttpServerInitializeEvent.EnvironmentInitializeEvent.handle() {
         envBuilder.connector {
-            host = HttpServerProperties.host
+            // An empty host can bind only to the container loopback on some Netty/JDK combinations.
+            host = HttpServerProperties.host.ifBlank { "0.0.0.0" }
             port = HttpServerProperties.port
         }
     }
